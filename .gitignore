@@ -1,0 +1,5 @@
+node_modules/
+
+# Imported documents: what `--out-dir` writes. Output the tool produces rather
+# than anything it needs, and a category import writes hundreds.
+vault/
