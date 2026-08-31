@@ -41,7 +41,7 @@ export {extractInfobox, extractImages, extractReferences, outline} from './extra
  *   A title, a `fr:Babylone` prefix, or a Wikipedia URL.
  * @param {object} [options]
  *   `lang`, `links`, `sections`, `keepSections`, `dropPronunciation`, `refs`,
- *   `wikidata`,
+ *   `wikidata`, `wikidataIds`,
  *   `categories`, `langLinks`, `wrap`, `cache`, `refresh`, `contact`, `file`,
  *   and `fetch` for an implementation of your own.
  * @returns {Promise<{source: string, data: object, counts: object}>}
@@ -97,7 +97,10 @@ export function buildDocument(page, options = {}) {
   const data = frontMatter(page, options, {
     ...record,
     wikidata: page.wikidata
-      ? wikidataRecord(page.wikidata.entity, page.wikidata.labels, {lang: target.lang})
+      ? wikidataRecord(page.wikidata.entity, page.wikidata.labels, {
+          lang: target.lang,
+          identifiers: options.wikidataIds
+        })
       : undefined,
     categories: page.categories,
     langlinks: page.langlinks,

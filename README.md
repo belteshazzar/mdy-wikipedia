@@ -97,22 +97,43 @@ wikidata:
   label: Babylon
   description: capital city of Babylonia and an archaeological site in modern-day Iraq
   claims:
-    instance-of: [city-state, ancient city, archaeological site]
-    inception: 3rd millennium BC
+    instance-of:
+      - {value: city-state, from: 1894 BC, to: 1792 BC}
+      - {value: ancient city}
+      - {value: archaeological site}
+    inception: {value: 3rd millennium BC, sourcing: no later than}
     coordinate-location: [{lat: 32.5425, lon: 44.42111111111111}, …]
-    capital-of: [Neo-Babylonian Empire, Achaemenid Empire, …]
-  identifiers:
-    geonames-id: '98228'
-    freebase-id: /m/01cyh
+    country:
+      - {value: Babylonia, from: 1880 BC, to: 911 BC}
+      - {value: Neo-Assyrian Empire, from: 911 BC, to: 626 BC}
+      - {value: Neo-Babylonian Empire, from: 626 BC, to: 539 BC}
+      - …
 ```
 
-Two things it does that a naive reading would not. **External identifiers are
-kept apart**: 66 of Babylon's 90 statements are GeoNames, Freebase, Quora and a
-dozen library catalogues, and mixed in they bury the two dozen claims anybody
-came for. The datatype says which is which, so no list of properties has to be
-maintained. And **rank is honoured**: Babylon's inception has a deprecated claim
-to 1894 BC and a live one to the 3rd millennium BC, and an importer that ignores
-rank quietly resurrects the wrong answer.
+Three things it does that a naive reading would not.
+
+**A statement is written with the years it held for.** This is not a
+refinement, it is the difference between a record and a wrong one. Babylon's
+`country` is twelve statements; flattened to twelve names it says Babylon is in
+twelve countries and that the Parthian Empire is two of them. Each one is
+qualified with the years it held, and with those it is three thousand years of
+who ruled Babylon — including Parthia twice, because Parthia held Babylon, lost
+it and took it back. Only the qualifiers that place a statement in time are
+kept, plus the one that says how sure Wikidata is: `population: 150000` is
+`circa`, and writing the number alone promotes a guess to a measurement. A
+property is one shape or the other and never both — if any of its statements is
+dated they all say so, so a reader asks once per property rather than once per
+value.
+
+**External identifiers are left out unless asked for.** 66 of Babylon's 90
+properties are GeoNames, Freebase, Quora, Giant Bomb and a dozen library
+catalogues: 32 KB of cross-references, none of it about Babylon. `--wikidata-ids`
+puts them back, under `identifiers` of their own. The datatype says which is
+which, so no list of properties has to be maintained.
+
+**Rank is honoured.** Babylon's inception has a deprecated claim to 1894 BC and
+a live one to the 3rd millennium BC, and an importer that ignores rank quietly
+resurrects the wrong answer.
 
 A time is written to the precision Wikidata claims for it — `1815-12-10`,
 `1815`, `1810s`, `19th century`, `3rd millennium BC`. `-1894-00-00T00:00:00Z`

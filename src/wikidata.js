@@ -10,18 +10,40 @@
  *
  * Two decisions worth naming.
  *
- * **External identifiers are kept apart.** 69 of Babylon's 131 statements are
- * `external-id` — GeoNames, Freebase, Quora, a dozen library catalogues — and
- * mixed in with the rest they bury the eleven claims anybody came for. They are
- * exactly what you want when you are reconciling against another database and
- * exactly what you do not want when you are reading, so they go under
- * `identifiers`. The datatype says which is which; no list of properties has to
- * be maintained.
+ * **External identifiers are left out unless asked for.** 66 of Babylon's 90
+ * properties are `external-id` — GeoNames, Freebase, Quora, Giant Bomb, a dozen
+ * library catalogues — 32 KB of cross-references that bury the two dozen claims
+ * anybody came for. They are what you want when reconciling against another
+ * database and not what you want when reading, so `identifiers` asks for them
+ * and gets them under a key of their own. The datatype says which is which; no
+ * list of properties has to be maintained.
+ *
+ * **A statement is written with the qualifiers that date it.** This is not a
+ * refinement, it is the difference between a record and a wrong one: Babylon's
+ * `country` is twelve statements, and flattened to twelve names it says Babylon
+ * is in twelve countries and that the Parthian Empire is there twice. Each one
+ * is qualified with the years it held — `Neo-Assyrian Empire, 911 BC to 626 BC`
+ * — and with those it is three thousand years of who ruled Babylon. Only the
+ * qualifiers that place a statement in time are kept, plus the one that says
+ * how sure Wikidata is of it: `population: 150000` is `circa` and should not be
+ * written as though it were counted.
  *
  * **Deprecated statements are dropped and preferred ones win.** Wikidata's rank
  * is how it records that a claim is superseded or disputed, and an importer
  * that ignores rank is an importer that quietly resurrects the wrong answer.
  */
+
+// The qualifiers worth keeping, and what to call them. Ordered, because two can
+// answer the same question — `start time` and `earliest date` are both a `from`
+// — and the first one Wikidata offers is the more definite of the two.
+const qualifiers = [
+  ['from', ['P580', 'P1319']],
+  ['to', ['P582', 'P1326']],
+  ['when', ['P585']],
+  // `sourcing circumstances`: `circa`, `presumably`, `near`. A number with this
+  // on it is an estimate, and dropping it promotes a guess to a measurement.
+  ['sourcing', ['P1480']]
+]
 
 const bce = (year) => Math.abs(year) + ' BC'
 const ordinal = (value) => {
@@ -37,7 +59,8 @@ const ordinal = (value) => {
  *   The entity as `Special:EntityData` gives it.
  * @param {Record<string, string>} labels
  *   Labels for every property and item it names.
- * @param {{lang?: string}} [options]
+ * @param {{lang?: string, identifiers?: boolean}} [options]
+ *   `identifiers` keeps the external-id properties, under a key of their own.
  * @returns {object}
  */
 export function wikidataRecord(entity, labels, options = {}) {
@@ -50,13 +73,23 @@ export function wikidataRecord(entity, labels, options = {}) {
   for (const [property, statements] of Object.entries(entity.claims ?? {})) {
     const name = slug(labels[property] ?? property)
     const best = rank(statements)
-    const values = best
-      .map((statement) => render(statement.mainsnak, labels))
-      .filter((value) => value !== undefined)
+    const isId = best[0].mainsnak?.datatype === 'external-id'
+
+    if (isId && !options.identifiers) continue
+
+    const values = even(
+      best
+        // An identifier is a string in another database's namespace and has
+        // nothing to be qualified by, so only real claims are asked.
+        .map((statement) =>
+          isId ? render(statement.mainsnak, labels) : qualified(statement, labels)
+        )
+        .filter((value) => value !== undefined)
+    )
 
     if (!values.length) continue
 
-    const into = best[0].mainsnak?.datatype === 'external-id' ? identifiers : claims
+    const into = isId ? identifiers : claims
     const value = values.length === 1 ? values[0] : values
 
     // Two properties can slug to the same name — `P625` and a duplicate under
@@ -77,6 +110,62 @@ export function wikidataRecord(entity, labels, options = {}) {
   if (Object.keys(identifiers).length) out.identifiers = identifiers
 
   return out
+}
+
+/**
+ * One shape for one property.
+ *
+ * Babylon was a `city-state` from 1894 BC to 1792 BC and is an `ancient city`
+ * with no dates on it at all, so `instance-of` would come out as a list of a
+ * record and two strings — and every reader of it would have to ask, of every
+ * element, which of the two it had. Asking once per property is better, so if
+ * any statement is dated they all say so.
+ *
+ * @param {Array<unknown>} values
+ * @returns {Array<unknown>}
+ */
+function even(values) {
+  const dated = values.some((value) => value !== null && typeof value === 'object' && 'value' in value)
+
+  if (!dated) return values
+
+  return values.map((value) =>
+    value !== null && typeof value === 'object' && 'value' in value ? value : {value}
+  )
+}
+
+/**
+ * One statement: its value, and what places that value in time.
+ *
+ * A bare value when there is nothing to add, which is most of them — a record
+ * where every scalar had become `{value: …}` would be a worse record for the
+ * sake of the few that need it.
+ *
+ * @param {object} statement
+ * @param {Record<string, string>} labels
+ * @returns {unknown}
+ */
+function qualified(statement, labels) {
+  const value = render(statement.mainsnak, labels)
+
+  if (value === undefined) return
+
+  /** @type {Record<string, unknown>} */
+  const found = {}
+
+  for (const [name, properties] of qualifiers) {
+    for (const property of properties) {
+      const snak = statement.qualifiers?.[property]?.[0]
+      const rendered = snak ? render(snak, labels) : undefined
+
+      if (rendered !== undefined) {
+        found[name] = rendered
+        break
+      }
+    }
+  }
+
+  return Object.keys(found).length ? {value, ...found} : value
 }
 
 /**

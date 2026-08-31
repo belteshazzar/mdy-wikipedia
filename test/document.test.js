@@ -310,22 +310,42 @@ test('the optional records reach the document, and a template', async () => {
 
   assert.deepEqual(messages, [])
   assert.equal(matter.wikidata.id, 'Q5684')
-  assert.ok(matter.wikidata.claims['instance-of'].includes('ancient city'))
-  assert.equal(matter.wikidata.identifiers['geonames-id'], '98228')
+  assert.ok(
+    matter.wikidata.claims['instance-of'].some((one) => one.value === 'ancient city')
+  )
+  // The identifiers are behind their own flag, and this document did not ask.
+  assert.equal(matter.wikidata.identifiers, undefined)
   assert.ok(matter.categories.includes('Archaeological sites in Iraq'))
   assert.equal(matter.langlinks.fr, 'Babylone')
 
   const facts = [
     '== Elsewhere',
     '',
-    "- {{ res.data.wikidata.claims['instance-of'][1] }} in {{ res.data.langlinks.fr }}",
-    "- {{ res.data.categories.length }} categories, GeoNames {{ res.data.wikidata.identifiers['geonames-id'] }}",
+    "- {{ res.data.wikidata.claims['instance-of'][1].value }} in {{ res.data.langlinks.fr }}",
+    '- {{ res.data.categories.length }} categories',
     ''
   ].join('\n')
   const html = await renderDocumentSet(source.trimEnd() + '\n\n' + facts)
 
   assert.match(html, /ancient city in Babylone/)
-  assert.match(html, /18 categories, GeoNames 98228/)
+  assert.match(html, /18 categories/)
+})
+
+test('--wikidata-ids puts the identifiers back, and a template reads them', async () => {
+  const {source} = buildDocument(
+    {...page, wikidata: {entity: babylonEntity, labels: babylonLabels}},
+    {now, refs: 'drop', images: false, wikidataIds: true}
+  )
+  const {matter} = parse(source).tree.data
+
+  assert.equal(matter.wikidata.identifiers['geonames-id'], '98228')
+
+  const html = await renderDocumentSet(
+    source.trimEnd() +
+      "\n\n== Elsewhere\n\n- GeoNames {{ res.data.wikidata.identifiers['geonames-id'] }}\n"
+  )
+
+  assert.match(html, /GeoNames 98228/)
 })
 
 test('the records that were not asked for are simply not there', () => {

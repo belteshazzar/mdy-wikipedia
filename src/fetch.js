@@ -21,6 +21,7 @@
  * after the first fetch.
  */
 
+import {createHash} from 'node:crypto'
 import {mkdir, readFile, writeFile} from 'node:fs/promises'
 import {homedir} from 'node:os'
 import {dirname, join} from 'node:path'
@@ -245,7 +246,11 @@ export async function fetchWikidata(id, target, options = {}) {
     const body = await get(
       target,
       {
-        name: 'wikidata-labels-' + at / 50,
+        // Named for what is in the batch rather than for where the batch
+        // falls. Ask for one id more than last time and every batch after it
+        // shifts along by one, and a cache keyed on position would answer each
+        // of them with the labels for the ids that used to be there.
+        name: 'wikidata-labels-' + digest(batch),
         url:
           'https://www.wikidata.org/w/api.php?action=wbgetentities&format=json' +
           '&formatversion=2&props=labels&languages=' + languages +
@@ -281,16 +286,40 @@ function namesIn(entity) {
     out.add(property)
 
     for (const statement of statements) {
-      const value = statement.mainsnak?.datavalue?.value
+      name(statement.mainsnak)
 
-      if (value?.id) out.add(value.id)
-      if (typeof value?.unit === 'string' && value.unit.includes('/Q')) {
-        out.add(value.unit.slice(value.unit.lastIndexOf('/') + 1))
+      // Qualifiers name properties and items of their own — `start time` is
+      // `P580`, and what it qualifies is dated by an item as often as by a
+      // date. Unlooked-up they would come back out as the ids they are.
+      for (const snaks of Object.values(statement.qualifiers ?? {})) {
+        for (const snak of snaks) name(snak)
       }
     }
   }
 
   return out
+
+  /** @param {object} [snak] */
+  function name(snak) {
+    if (snak?.property) out.add(snak.property)
+
+    const value = snak?.datavalue?.value
+
+    if (value?.id) out.add(value.id)
+    if (typeof value?.unit === 'string' && value.unit.includes('/Q')) {
+      out.add(value.unit.slice(value.unit.lastIndexOf('/') + 1))
+    }
+  }
+}
+
+/**
+ * A short, stable name for a set of ids.
+ *
+ * @param {Array<string>} ids
+ * @returns {string}
+ */
+function digest(ids) {
+  return createHash('sha1').update(ids.join('|')).digest('hex').slice(0, 10)
 }
 
 /**

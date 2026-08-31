@@ -53,6 +53,10 @@ Options:
                           drop       neither
   --no-infobox          do not read the infobox into the front matter
   --no-images           do not list the images in the front matter
+  --wikidata-ids        keep Wikidata's external identifiers too — VIAF, GND,
+                        GeoNames and sixty more. Left out by default: they are
+                        two thirds of the properties on a page and none of them
+                        is about the subject
   --wikidata            resolve the page's Wikidata claims into the front
                         matter (two more requests: the entity, then the
                         labels for everything it names)
@@ -89,6 +93,7 @@ const {values, positionals} = parseArgs({
     'drop-pronunciation': {type: 'boolean'},
     refs: {type: 'string'},
     wikidata: {type: 'boolean'},
+    'wikidata-ids': {type: 'boolean'},
     categories: {type: 'boolean'},
     'lang-links': {type: 'boolean'},
     wrap: {type: 'string'},
@@ -133,6 +138,7 @@ const settings = {
   dropPronunciation: values['drop-pronunciation'],
   refs: values.refs ?? 'footnotes',
   wikidata: values.wikidata,
+  wikidataIds: values['wikidata-ids'],
   categories: values.categories,
   langLinks: values['lang-links'],
   infobox: !values['no-infobox'],

@@ -4,6 +4,7 @@ import {wikidataRecord} from '../src/wikidata.js'
 import {babylonEntity, babylonLabels} from './fixture.js'
 
 const record = wikidataRecord(babylonEntity, babylonLabels)
+const withIds = wikidataRecord(babylonEntity, babylonLabels, {identifiers: true})
 
 test('the entity says what it is', () => {
   assert.equal(record.id, 'Q5684')
@@ -14,9 +15,10 @@ test('the entity says what it is', () => {
 test('claims are readable, because both halves are looked up', () => {
   // `P31` → `Q133442` says nothing until both are resolved.
   assert.deepEqual(record.claims['instance-of'], [
-    'city-state',
-    'ancient city',
-    'archaeological site'
+    // A city-state only while it was one: Hammurabi's Babylon.
+    {value: 'city-state', from: '1894 BC', to: '1792 BC'},
+    {value: 'ancient city'},
+    {value: 'archaeological site'}
   ])
   assert.equal(
     record.claims['located-in-the-administrative-territorial-entity'],
@@ -24,13 +26,11 @@ test('claims are readable, because both halves are looked up', () => {
   )
 })
 
-test('external identifiers are kept apart from the claims', () => {
-  // 66 of Babylon's statements are external ids. Mixed in, they bury the two
-  // dozen claims anybody came for; the datatype says which is which, so no
-  // list of properties has to be kept up to date.
-  assert.equal(record.identifiers['geonames-id'], '98228')
-  assert.equal(record.identifiers['freebase-id'], '/m/01cyh')
-  assert.ok(Object.keys(record.identifiers).length > 50)
+test('external identifiers are left out unless they are asked for', () => {
+  // 66 of Babylon's 90 properties are external ids — 32 KB of cross-references
+  // to other databases, none of it about Babylon. The datatype says which is
+  // which, so no list of properties has to be kept up to date.
+  assert.equal(record.identifiers, undefined)
   assert.ok(Object.keys(record.claims).length < 30)
 
   for (const name of Object.keys(record.claims)) {
@@ -38,11 +38,78 @@ test('external identifiers are kept apart from the claims', () => {
   }
 })
 
+test('and are kept apart from the claims when they are', () => {
+  assert.equal(withIds.identifiers['geonames-id'], '98228')
+  assert.equal(withIds.identifiers['freebase-id'], '/m/01cyh')
+  assert.ok(Object.keys(withIds.identifiers).length > 50)
+  assert.deepEqual(
+    Object.keys(withIds.claims),
+    Object.keys(record.claims),
+    'asking for them changes nothing about the claims'
+  )
+})
+
+test('a statement is written with the years it held for', () => {
+  // Babylon's `country` is twelve statements. Flattened to twelve names it says
+  // Babylon is in twelve countries and that the Parthian Empire is two of them;
+  // with the qualifiers it is three thousand years of who ruled Babylon.
+  const held = record.claims.country
+
+  assert.equal(held.length, 12)
+  assert.deepEqual(held[0], {value: 'Babylonia', from: '1880 BC', to: '911 BC'})
+  assert.deepEqual(held[1], {
+    value: 'Neo-Assyrian Empire',
+    from: '911 BC',
+    to: '626 BC'
+  })
+
+  // Twice, and they are different: Parthia held Babylon, lost it, took it back.
+  const parthia = held.filter((one) => one.value === 'Parthian Empire')
+
+  assert.equal(parthia.length, 2)
+  assert.notDeepEqual(parthia[0], parthia[1])
+})
+
+test('a value nobody counted is not written as though it were', () => {
+  // `sourcing circumstances: circa`. Dropping it promotes a guess to a
+  // measurement.
+  assert.deepEqual(record.claims.population, {value: '150000', sourcing: 'circa'})
+})
+
+test('a statement with nothing to date it stays the value it was', () => {
+  // Most of them. A record where every scalar had become `{value: …}` would be
+  // a worse record for the sake of the few that need it.
+  assert.equal(record.claims['commons-category'], 'Babylon')
+  assert.equal(record.claims.continent, 'Asia')
+  assert.equal(record.claims['native-label'], 'Babili(m)')
+})
+
+test('a property is one shape or the other, never both', () => {
+  // `instance-of` is three statements and only the first is dated. Left alone
+  // it would be a list of a record and two strings, and every reader of it
+  // would have to ask of every element which of the two it had.
+  for (const value of Object.values(record.claims)) {
+    const list = Array.isArray(value) ? value : [value]
+    const records = list.filter(
+      (one) => one !== null && typeof one === 'object' && 'value' in one
+    )
+
+    assert.ok(
+      records.length === 0 || records.length === list.length,
+      'a property should not mix dated statements with bare ones'
+    )
+  }
+})
+
 test('a deprecated statement is not the answer', () => {
   // Babylon's inception has two claims: a deprecated one to the year 1894 BC,
   // and a live one to the 3rd millennium BC. Ignoring rank writes down the
   // superseded answer with nothing to say it is superseded.
-  assert.equal(record.claims.inception, '3rd millennium BC')
+  // And `no later than` is Wikidata saying the date is a bound, not a year.
+  assert.deepEqual(record.claims.inception, {
+    value: '3rd millennium BC',
+    sourcing: 'no later than'
+  })
 })
 
 test('a time is written to the precision it claims', () => {
@@ -104,7 +171,12 @@ test('a value nobody knows is not written down as one', () => {
 test('without labels it degrades to ids rather than to nothing', () => {
   const bare = wikidataRecord(babylonEntity, {})
 
-  assert.deepEqual(bare.claims.p31, ['Q133442', 'Q15661340', 'Q839954'])
+  // The dates come through either way: a time is a time without a lookup.
+  assert.deepEqual(bare.claims.p31, [
+    {value: 'Q133442', from: '1894 BC', to: '1792 BC'},
+    {value: 'Q15661340'},
+    {value: 'Q839954'}
+  ])
 })
 
 test('a label in any script keys as itself', () => {
@@ -124,7 +196,8 @@ test('a label in any script keys as itself', () => {
         ]
       }
     },
-    {P1: 'Encyclopædia Universalis ID'}
+    {P1: 'Encyclopædia Universalis ID'},
+    {identifiers: true}
   )
 
   assert.equal(record.identifiers['encyclopædia-universalis-id'], 'babylone')
