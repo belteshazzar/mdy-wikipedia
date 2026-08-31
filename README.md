@@ -9,9 +9,11 @@ The design is [docs/wikipedia-plan.md](docs/wikipedia-plan.md).
 
 ## Getting it to run
 
-It is built on [mdy-docs](https://github.com/mdy-docs/mdy-docs), which it takes
-by relative `file:` path rather than from npm, so it expects to sit where it was
-extracted from:
+It is built on [mdy-docs](https://github.com/mdy-docs/mdy-docs), which is a peer
+dependency: whoever imports this package supplies it, so a host that already has
+mdy-docs checked out anywhere does not get a second copy nailed to a fixed
+relative path. To develop or test it here, a `file:` devDependency supplies the
+same thing, and that one does expect to sit where it was extracted from:
 
 ```sh
 git clone --recurse-submodules https://github.com/mdy-docs/mdy-docs.git
@@ -22,8 +24,9 @@ cd mdy-docs && npm install          # see its README: the engines need building
 cd packages/mdy-wikipedia && npm install && npm test
 ```
 
-Anywhere else, `npm install` will not find `file:../..`. The round-trip test
-reads mdy-docs' own `examples/` and `test/` documents for the same reason —
+Anywhere else, `npm install` will not find the devDependency's `file:../..`, and
+the tests will not run. The round-trip test reads mdy-docs' own `examples/` and
+`test/` documents for the same reason —
 `toMdy(fromMdy(…))` over every `.mdy` in the repository is a much broader net
 than fixtures written here alone.
 
