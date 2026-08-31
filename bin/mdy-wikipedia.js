@@ -53,13 +53,14 @@ Options:
                           drop       neither
   --no-infobox          do not read the infobox into the front matter
   --no-images           do not list the images in the front matter
+  --no-wikidata         do not resolve the page's Wikidata claims into the
+                        front matter. They are resolved by default, at the cost
+                        of two more requests — the entity, then the labels for
+                        everything it names — both of which cache
   --wikidata-ids        keep Wikidata's external identifiers too — VIAF, GND,
                         GeoNames and sixty more. Left out by default: they are
                         two thirds of the properties on a page and none of them
                         is about the subject
-  --wikidata            resolve the page's Wikidata claims into the front
-                        matter (two more requests: the entity, then the
-                        labels for everything it names)
   --categories          list the page's categories
   --lang-links          list the page in every other language it exists in
   --wrap <columns>      wrap paragraphs (default: 78; 0 for one line each)
@@ -92,7 +93,10 @@ const {values, positionals} = parseArgs({
     'keep-sections': {type: 'boolean'},
     'drop-pronunciation': {type: 'boolean'},
     refs: {type: 'string'},
+    // Accepted and inert: it asks for what already happens, and refusing it
+    // would break a command line that has been asking politely all along.
     wikidata: {type: 'boolean'},
+    'no-wikidata': {type: 'boolean'},
     'wikidata-ids': {type: 'boolean'},
     categories: {type: 'boolean'},
     'lang-links': {type: 'boolean'},
@@ -137,7 +141,7 @@ const settings = {
   keepSections: values['keep-sections'],
   dropPronunciation: values['drop-pronunciation'],
   refs: values.refs ?? 'footnotes',
-  wikidata: values.wikidata,
+  wikidata: !values['no-wikidata'],
   wikidataIds: values['wikidata-ids'],
   categories: values.categories,
   langLinks: values['lang-links'],

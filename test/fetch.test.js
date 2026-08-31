@@ -4,6 +4,7 @@ import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import test from 'node:test'
 import {fetchCategory, fetchIndexes, fetchPage, fetchWikidata, resolveTarget, userAgent} from '../src/fetch.js'
+import {wikipediaToMdy} from '../src/index.js'
 import {babylonIndexes} from './fixture.js'
 
 /** A fetch that answers from a table and records what it was asked. */
@@ -308,4 +309,63 @@ test('a rate limit is waited out rather than argued with', async () => {
   assert.equal(page.html, '<html></html>')
   assert.equal(calls, 3, 'the summary is fetched too')
   assert.match(messages[0], /Wikipedia asked to wait/)
+})
+
+test('wikidata is resolved without being asked, and skipped when refused', async () => {
+  const entity = {
+    entities: {
+      Q5684: {
+        id: 'Q5684',
+        labels: {en: {value: 'Babylon'}},
+        claims: {
+          P31: [
+            {
+              rank: 'normal',
+              mainsnak: {
+                snaktype: 'value',
+                datatype: 'wikibase-item',
+                datavalue: {type: 'wikibase-entityid', value: {id: 'Q2'}}
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+  const page = {
+    ok: true,
+    html: '<body><section data-mw-section-id="0"><p>Babylon.</p></section></body>'
+  }
+  const table = {
+    [htmlUrl]: page.html,
+    [summaryUrl]: JSON.stringify({titles: {normalized: 'Babylon'}, wikibase_item: 'Q5684'}),
+    'https://www.wikidata.org/wiki/Special:EntityData/Q5684.json': JSON.stringify(entity)
+  }
+  const wikidata = (calls) =>
+    calls.filter((call) => call.url.includes('wikidata.org')).length
+
+  const asked = stub(table)
+  const {source} = await wikipediaToMdy('Babylon', {
+    fetch: asked.fetch,
+    cache: false,
+    delay: 0,
+    images: false,
+    refs: 'drop'
+  })
+
+  assert.ok(wikidata(asked.calls) > 0, 'nobody had to ask for it')
+  assert.match(source, /^wikidata:$/m)
+
+  const refused = stub(table)
+  const plain = await wikipediaToMdy('Babylon', {
+    fetch: refused.fetch,
+    cache: false,
+    delay: 0,
+    images: false,
+    refs: 'drop',
+    wikidata: false
+  })
+
+  assert.equal(wikidata(refused.calls), 0, '--no-wikidata costs nothing')
+  assert.doesNotMatch(plain.source, /^wikidata:$/m)
 })

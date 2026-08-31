@@ -50,13 +50,19 @@ export async function wikipediaToMdy(input, options = {}) {
   const target = resolveTarget(input, options)
   const page = await fetchPage(target, options)
 
-  // The optional records, each its own round trip and each behind its own
-  // flag. They are asked for here rather than in `buildDocument` so that
-  // everything after the network stays a pure function of what came back.
+  // The extra records, each its own round trip. Asked for here rather than in
+  // `buildDocument` so that everything after the network stays a pure function
+  // of what came back.
+  //
+  // Wikidata is fetched unless it is refused: the claims are the part of a page
+  // that is already a record — typed, dated, and the same in every language —
+  // and a document that leaves them out is the poorer of the two for the sake
+  // of two requests that cache.
   const indexes = await fetchIndexes(target, options, options)
-  const wikidata = options.wikidata
-    ? await fetchWikidata(page.summary?.wikibase_item, target, options)
-    : undefined
+  const wikidata =
+    options.wikidata === false
+      ? undefined
+      : await fetchWikidata(page.summary?.wikibase_item, target, options)
 
   return buildDocument({...page, ...indexes, wikidata, target}, options)
 }

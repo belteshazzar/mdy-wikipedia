@@ -84,12 +84,14 @@ that is really in the rendered page.
 
 ### The optional records
 
-Three more, each its own round trip and each behind its own flag.
+Three more, each its own round trip. Wikidata is resolved unless refused;
+categories and language links are asked for.
 
-**`--wikidata`** resolves the page's Wikidata entity. The claims are typed
-where an infobox is text, which is the reason to want them — but everything
-arrives as opaque ids (`P31` → `Q133442`), so a second request looks up the
-labels for all ~150 of them, fifty at a time as the API asks:
+**Wikidata** is resolved by default — `--no-wikidata` turns it off. The claims
+are the part of a page that is already a record: typed where an infobox is text,
+dated, and the same in every language. Everything arrives as opaque ids
+(`P31` → `Q133442`), so a second request looks up the labels for all ~175 of
+them, fifty at a time as the API asks:
 
 ```yaml
 wikidata:
