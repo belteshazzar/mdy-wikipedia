@@ -62,6 +62,30 @@ const drops = [
     became: 'footnotes'
   },
   {name: 'indicators', typeOf: ['mw:Extension/indicator']},
+  // How to say the title, which opens a great many articles and is the one
+  // thing in a lead that is about the word rather than about the subject:
+  // `Babylon (/ˈbæbɪlɒn/ BAB-il-on) was an ancient city`. Behind a flag,
+  // because for a pronouncing dictionary it is the article.
+  //
+  // Wikipedia marks all of it. `IPA` and `IPA-label` are the phonetic
+  // spelling, `rt-commentedText` is the hover-annotated wrapper `{{IPAc-en}}`
+  // builds, `respell` is `{{respell}}`, and both help links name the key a
+  // reader would need to read any of it. The speaker button that plays the
+  // word — `mw:Extension/phonos`, or `haudio` before it — is the same sentence
+  // saying the same thing out loud, and it has to go by name: it keeps
+  // attributes of its own, so the plain-span unwrap leaves it standing where
+  // the space beside it would have nothing to be a space between.
+  {
+    name: 'pronunciation',
+    when: (options) => options.dropPronunciation === true,
+    className: [
+      'IPA', 'IPA-label', 'ipa', 'respell', 'rt-commentedText', 'ext-phonos', 'haudio'
+    ],
+    typeOf: ['mw:Extension/phonos'],
+    test: (node) =>
+      node.tagName === 'a' &&
+      /^\.\/Help:(IPA|Pronunciation_respelling_key)/.test(String(node.properties?.href ?? ''))
+  },
   // A formula, kept as the TeX it was written as. Parsoid renders `<math>` to
   // MathML — 28 elements for one line of Mesopotamia — and MDY has no inline
   // element syntax to hold any of it, so unwrapping leaves `1 + 24 60 + 51 60
@@ -173,6 +197,11 @@ const unwraps = [
  *   What becomes of the citations. `footnotes` puts a real mdy footnote where
  *   each one was; `data` and `drop` take them out, the first keeping them in
  *   the front matter instead.
+ * @property {boolean} [dropPronunciation=false]
+ *   Whether to take out how the title is said — the IPA and the respelling
+ *   that open so many articles — along with the brackets and separators that
+ *   were punctuation for it. Off by default: it is the article's own first
+ *   sentence, and only a reader who does not want it knows that.
  * @property {Map<string, object>} [references]
  *   The citations, as `extractReferences` read them off the page before this
  *   ran. Without them a `<sup>` has nothing to point at and goes.
@@ -284,6 +313,11 @@ function pickSections(body, options, counts) {
 function walk(nodes, options, counts) {
   /** @type {Array<import('hast').RootContent>} */
   const out = []
+  // Whether anything was taken out of *this* run of children that leaves
+  // punctuation behind. Taking `/ˈbæbɪlɒn/ BAB-il-on` out from between `(` and
+  // `)` leaves the brackets, and an empty bracket is not what the sentence
+  // said.
+  let mend = false
 
   for (const node of nodes) {
     if (node.type === 'comment') continue
@@ -293,7 +327,9 @@ function walk(nodes, options, counts) {
       continue
     }
 
-    const dropped = drops.find((rule) => matches(node, rule))
+    const dropped = drops.find(
+      (rule) => (rule.when === undefined || rule.when(options)) && matches(node, rule)
+    )
 
     if (dropped) {
       // A rule may put something in the place of what it takes: a citation
@@ -306,6 +342,7 @@ function walk(nodes, options, counts) {
       count(counts, instead ? dropped.became ?? dropped.name : dropped.name)
 
       if (instead) out.push(instead)
+      else if (dropped.name === 'pronunciation') mend = true
 
       continue
     }
@@ -354,7 +391,75 @@ function walk(nodes, options, counts) {
     })
   }
 
-  return out
+  return mend ? mendPunctuation(out) : out
+}
+
+/**
+ * Close up the punctuation around something that has been taken out.
+ *
+ * `Babylon (/ˈbæbɪlɒn/ BAB-il-on) was` becomes `Babylon ( ) was` the moment the
+ * pronunciation goes, and `Qatar (Arabic: قطر; /ˈkɑːtɑːr/) is` becomes
+ * `Qatar (Arabic: قطر; ) is`. The bracket was punctuation *for* what was
+ * removed, so it goes with it — but only the bracket that is now empty, and
+ * only the separator that now has nothing on one side of it.
+ *
+ * Joining the text nodes first is what makes this a question about a string
+ * rather than about a tree: whatever was dropped was between two pieces of
+ * text, so the two are neighbours now and the damage is inside one of them.
+ *
+ * Only ever called on a run something was actually taken out of. Over a whole
+ * document these patterns would eventually meet a sentence that meant them.
+ *
+ * @param {Array<import('hast').RootContent>} nodes
+ * @returns {Array<import('hast').RootContent>}
+ */
+function mendPunctuation(nodes) {
+  /** @type {Array<import('hast').RootContent>} */
+  const joined = []
+
+  for (const node of nodes) {
+    const last = joined.at(-1)
+
+    if (node.type === 'text' && last?.type === 'text') last.value += node.value
+    else joined.push(node.type === 'text' ? {...node} : node)
+  }
+
+  for (const node of joined) {
+    if (node.type !== 'text') continue
+
+    node.value = node.value
+      // A bracket with nothing of its own left in it. Both ends have to be in
+      // this one piece of text for that to be knowable: if anything survived
+      // inside the brackets it would be an element between them, and the
+      // closing bracket would be in a piece of text of its own.
+      .replace(/\(([^()]*)\)/g, (whole, inside) => (saysNothing(inside) ? '' : whole))
+      // A separator with nothing before it, or nothing after it.
+      .replace(/\(\s*[;,]\s*/g, '(')
+      .replace(/\s*[;,]\s*\)/g, ')')
+      // The space that was holding what was taken out.
+      .replace(/\(\s+/g, '(')
+      .replace(/\s+\)/g, ')')
+      // The gap the removal left in the middle of a line.
+      .replace(/[^\S\n]{2,}/g, ' ')
+  }
+
+  return joined.filter((node) => node.type !== 'text' || node.value !== '')
+}
+
+// What can be left between brackets and still leave nothing worth saying.
+// `Ur (/ʊr/ or /ɜːr/)` had two pronunciations and a word joining them, and the
+// word was punctuation for them as much as the brackets were.
+const joiners = new Set(['or', 'and', 'ou', 'et', 'oder', 'und', 'o', 'y', 'e'])
+
+/**
+ * @param {string} value
+ *   What is left inside a pair of brackets.
+ * @returns {boolean}
+ */
+function saysNothing(value) {
+  const words = value.split(/[\s,;:/·—–-]+/u).filter(Boolean)
+
+  return words.every((word) => joiners.has(word.toLowerCase()))
 }
 
 // Attributes that describe the page Wikipedia rendered rather than the

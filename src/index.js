@@ -40,7 +40,8 @@ export {extractInfobox, extractImages, extractReferences, outline} from './extra
  * @param {string} input
  *   A title, a `fr:Babylone` prefix, or a Wikipedia URL.
  * @param {object} [options]
- *   `lang`, `links`, `sections`, `keepSections`, `refs`, `wikidata`,
+ *   `lang`, `links`, `sections`, `keepSections`, `dropPronunciation`, `refs`,
+ *   `wikidata`,
  *   `categories`, `langLinks`, `wrap`, `cache`, `refresh`, `contact`, `file`,
  *   and `fetch` for an implementation of your own.
  * @returns {Promise<{source: string, data: object, counts: object}>}

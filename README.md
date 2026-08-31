@@ -151,7 +151,7 @@ import {wikipediaToMdy} from '@mdy-docs/mdy-wikipedia'
 const {source, counts} = await wikipediaToMdy('Babylon', {links: 'wiki'})
 ```
 
-`mdy-wikipedia --help` lists the options. Two are worth knowing about here.
+`mdy-wikipedia --help` lists the options. Three are worth knowing about here.
 
 **`--links`** decides how an internal link is written, and the default is the
 full URL rather than `/wiki/Babylonia`. That is not the obvious choice and it
@@ -162,6 +162,27 @@ Wikipedia's, where `/wiki/Help:IPA/English` would arrive as
 whose pages these really are, and `--links wiki` writes `[[ Babylonia ]]`, which
 mdy records on `res.data.links` as it parses — the mode that makes a directory
 of imports behave like a vault.
+
+**`--drop-pronunciation`** takes out how the title is said. A great many
+articles open with it — `Babylon (/ˈbæbɪlɒn/ BAB-il-on) was an ancient city` —
+and it is the one thing in a lead that is about the word rather than about the
+subject. It is off by default because it *is* the article's first sentence, and
+only a reader who does not want it knows that.
+
+What goes with it is the punctuation that was punctuation for it. The bracket
+that now holds nothing goes; a separator with nothing left on one side of it
+goes; a word that was only joining two pronunciations to each other goes. What
+the bracket held besides survives:
+
+```
+Babylon (/ˈbæbɪlɒn/ BAB-il-on) was       →  Babylon was
+Euphrates (/juːˈfreɪtiːz/; see below) is →  Euphrates (see below) is
+Copenhagen (Danish: København [kʰøpm̩ˈhɑwˀn] 🔊) is  →  Copenhagen (Danish: København) is
+Ur (/ʊr/ or /ɜːr/) was                   →  Ur was
+```
+
+That mending only ever runs where something was actually taken out, so a
+bracket that never held a pronunciation is never rewritten.
 
 **Everything left out is reported**, on stderr, counted by rule:
 

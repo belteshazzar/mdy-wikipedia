@@ -246,3 +246,84 @@ test('what Wikipedia draws and hides does not come through', () => {
   assert.equal(counts.hidden, 1)
   assert.equal(toText(out).replace(/\s+/g, ' ').trim(), 'Born 10 December 1815')
 })
+
+// ------------------------------------------------------------ pronunciation --
+
+/** A lead paragraph, cleaned both ways, as one line of text. */
+function lead(html, options) {
+  const page = fromHtml('<body><section>' + html + '</section></body>')
+  const {tree: out, counts} = clean(page, {lang: 'en', title: 'X', ...options})
+
+  return {text: toText(out).replace(/\s+/g, ' ').trim(), counts}
+}
+
+const ipa = '<span class="rt-commentedText nowrap"><span class="IPA" lang="en-fonipa">' +
+  '<a rel="mw:WikiLink" href="./Help:IPA/English">/ˈbæbɪlɒn/</a></span></span>'
+const respell = '<a rel="mw:WikiLink" href="./Help:Pronunciation_respelling_key">' +
+  '<i title="English pronunciation respelling">BAB-il-on</i></a>'
+
+test('how the title is said stays unless it is asked to go', () => {
+  const {text} = lead('<p><b>Babylon</b> (' + ipa + ' ' + respell + ') was a city.</p>')
+
+  assert.match(text, /ˈbæbɪlɒn/)
+  assert.match(text, /BAB-il-on/)
+})
+
+test('and goes with its brackets when it is', () => {
+  const {text, counts} = lead(
+    '<p><b>Babylon</b> (' + ipa + ' ' + respell + ') was a city.</p>',
+    {dropPronunciation: true}
+  )
+
+  assert.equal(text, 'Babylon was a city.')
+  assert.ok(counts.pronunciation > 0, 'and says how much of it there was')
+})
+
+test('the rest of a bracket that held more than the pronunciation stays', () => {
+  const {text} = lead(
+    '<p><b>Copenhagen</b> (Danish: <i lang="da">København</i> ' + ipa + ') is a city.</p>',
+    {dropPronunciation: true}
+  )
+
+  assert.equal(text, 'Copenhagen (Danish: København) is a city.')
+})
+
+test('a separator with nothing left on one side of it goes too', () => {
+  const {text} = lead(
+    '<p><b>Euphrates</b> (' + ipa + '; see below) is a river.</p>',
+    {dropPronunciation: true}
+  )
+
+  assert.equal(text, 'Euphrates (see below) is a river.')
+})
+
+test('a word joining two pronunciations is punctuation for them', () => {
+  const {text} = lead(
+    '<p><b>Ur</b> (' + ipa + ' or ' + ipa + ') was a city.</p>',
+    {dropPronunciation: true}
+  )
+
+  assert.equal(text, 'Ur was a city.')
+})
+
+test('the button that says it out loud is the same sentence', () => {
+  // It keeps attributes of its own, so the plain-span unwrap leaves it
+  // standing — and what it leaves is a space with nothing to be between.
+  const phonos = '<span class="ext-phonos" typeof="mw:Extension/phonos">' +
+    '<span data-nosnippet="" class="ext-phonos-PhonosButton"></span></span>'
+  const {text} = lead(
+    '<p><b>Copenhagen</b> (Danish: <i>København</i> ' + ipa + ' ' + phonos + ') is a city.</p>',
+    {dropPronunciation: true}
+  )
+
+  assert.equal(text, 'Copenhagen (Danish: København) is a city.')
+})
+
+test('a bracket that never held a pronunciation is not touched', () => {
+  const {text} = lead(
+    '<p><b>Ur</b> (' + ipa + ') was a city (see below) near Uruk (or Erech).</p>',
+    {dropPronunciation: true}
+  )
+
+  assert.equal(text, 'Ur was a city (see below) near Uruk (or Erech).')
+})

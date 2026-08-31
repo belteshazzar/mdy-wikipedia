@@ -44,6 +44,9 @@ Options:
   --sections <list>     only these sections, by heading or id; "lead" is the
                         part above the first heading
   --keep-sections       keep See also / References / External links as prose
+  --drop-pronunciation  take out how the title is said — the IPA and the
+                        respelling that open the lead — and the brackets that
+                        were punctuation for it
   --refs <mode>         what becomes of the citations (default: footnotes)
                           footnotes  a real mdy footnote where each one was
                           data       a references list in the front matter
@@ -83,6 +86,7 @@ const {values, positionals} = parseArgs({
     links: {type: 'string'},
     sections: {type: 'string'},
     'keep-sections': {type: 'boolean'},
+    'drop-pronunciation': {type: 'boolean'},
     refs: {type: 'string'},
     wikidata: {type: 'boolean'},
     categories: {type: 'boolean'},
@@ -126,6 +130,7 @@ const settings = {
   links: values.links ?? 'url',
   sections: values.sections?.split(',').map((name) => name.trim()).filter(Boolean),
   keepSections: values['keep-sections'],
+  dropPronunciation: values['drop-pronunciation'],
   refs: values.refs ?? 'footnotes',
   wikidata: values.wikidata,
   categories: values.categories,
