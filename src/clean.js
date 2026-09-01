@@ -54,6 +54,11 @@ const drops = [
   {name: 'hatnotes', className: ['hatnote', 'dablink', 'shortdescription']},
   {
     name: 'banners',
+    // A `role="navigation"` table is a navbox or a series sidebar — "Part of a
+    // series on Ancient Egyptian religion" and its twenty links — which says
+    // so in the one attribute that cannot mean anything else. 19 of 41
+    // ancient-history articles opened with one, above the first sentence.
+    test: (node) => node.properties?.role === 'navigation',
     className: [
       'navbox', 'navbox-styles', 'vertical-navbox', 'metadata', 'ambox',
       'mbox', 'ombox', 'sistersitebox', 'side-box', 'navigation-not-searchable',

@@ -358,3 +358,16 @@ test('a citation’s identifier link keeps its number and loses its link', () =>
   assert.equal(counts['identifier-links'], 1)
   assert.match(toText(out), /978-0-19-966226-5/)
 })
+
+test('a navigation table is chrome, whatever it is classed as', () => {
+  const tree = fromHtml(
+    '<table role="navigation"><tr><td>Part of a series on X</td></tr></table>' +
+      '<table><tr><td>A real table</td></tr></table>'
+  )
+  const {tree: out, counts} = clean(tree, babylonTarget)
+  const tables = elements(out).filter((element) => element.tagName === 'table')
+
+  assert.equal(tables.length, 1)
+  assert.equal(counts.banners, 1)
+  assert.match(toText(out), /A real table/)
+})
