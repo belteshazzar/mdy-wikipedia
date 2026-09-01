@@ -327,3 +327,34 @@ test('a bracket that never held a pronunciation is not touched', () => {
 
   assert.equal(text, 'Ur was a city (see below) near Uruk (or Erech).')
 })
+
+test('a page outside the article namespace is not slugified into a vault', () => {
+  const tree = fromHtml(
+    '<p><a href="./Help:IPA/English">IPA</a> and ' +
+      '<a href="./Rome:_Total_War">a colon of its own</a></p>'
+  )
+  const hrefs = (options) =>
+    elements(clean(tree, {...babylonTarget, ...options}).tree)
+      .filter((element) => element.tagName === 'a')
+      .map((element) => element.properties.href)
+
+  // `Help:IPA/English` slugifies to `helpipa/english` — a document that will
+  // never exist, in a subdirectory that will never exist either, because the
+  // slugifier keeps the slash. It stays pointing at Wikipedia instead.
+  assert.deepEqual(hrefs({links: 'wiki'}), [
+    'https://en.wikipedia.org/wiki/Help%3AIPA%2FEnglish',
+    'rome-total-war'
+  ])
+
+  // The other modes were already writing it as a link out; nothing changes.
+  assert.ok(hrefs().includes('https://en.wikipedia.org/wiki/Help%3AIPA%2FEnglish'))
+})
+
+test('a citation’s identifier link keeps its number and loses its link', () => {
+  const tree = fromHtml('<p>ISBN <a href="./ISBN_(identifier)">978-0-19-966226-5</a></p>')
+  const {tree: out, counts} = clean(tree, babylonTarget)
+
+  assert.equal(elements(out).filter((element) => element.tagName === 'a').length, 0)
+  assert.equal(counts['identifier-links'], 1)
+  assert.match(toText(out), /978-0-19-966226-5/)
+})

@@ -202,3 +202,41 @@ test('a label in any script keys as itself', () => {
 
   assert.equal(record.identifiers['encyclopædia-universalis-id'], 'babylone')
 })
+
+test('a property whose every statement is deprecated says nothing', () => {
+  // Q8409 — Alexander the Great — carries an IMDb id and a Great Russian
+  // Encyclopedia id that are each a single deprecated claim, so `rank` has
+  // nothing to hand back. Reading a datatype off the first of none is how six
+  // of forty-one ancient-history articles failed to import at all.
+  const record = wikidataRecord(
+    {
+      id: 'Q8409',
+      claims: {
+        P345: [
+          {
+            rank: 'deprecated',
+            mainsnak: {
+              snaktype: 'value',
+              datatype: 'external-id',
+              datavalue: {type: 'string', value: 'nm0018002'}
+            }
+          }
+        ],
+        P31: [
+          {
+            rank: 'normal',
+            mainsnak: {
+              snaktype: 'value',
+              datatype: 'wikibase-item',
+              datavalue: {type: 'wikibase-entityid', value: {id: 'Q5'}}
+            }
+          }
+        ]
+      }
+    },
+    {P345: 'IMDb ID', P31: 'instance of', Q5: 'human'}
+  )
+
+  assert.equal(record.claims['imdb-id'], undefined)
+  assert.equal(record.claims['instance-of'], 'human')
+})

@@ -31,6 +31,21 @@ const parsoidId = /^mw[A-Za-z0-9_-]{0,4}$/
 // An internal link, as Parsoid writes it: `./Third_Dynasty_of_Ur`.
 const wikiHref = /^\.\/([^#]*)(#.*)?$/
 
+// MediaWiki's canonical namespace prefixes. Every wiki accepts them whatever
+// its own language calls them, so this reads `Help:` on fr.wikipedia too. A
+// page in one of them is a link out of the encyclopedia's prose — and the
+// test is the prefix rather than the punctuation, because an article title
+// may carry a colon of its own (`Rome: Total War`).
+const namespaced =
+  /^(Media|Special|Talk|User|Project|Wikipedia|File|Image|MediaWiki|Template|Help|Category|Portal|Draft|TimedText|Module|Gadget|Topic)( talk)?:/i
+
+// `ISBN`, `doi` and `JSTOR` in a citation each link to a page named for the
+// scheme — `ISBN (identifier)`, a redirect to `Special:BookSources` — so that
+// a reader can look the number up. It is machinery rather than a subject, and
+// it is not rare: 680 of the 5,570 links in a 41-article ancient-history
+// corpus, wanted by 31 of its documents. The number stays, the link goes.
+const identifier = /^\.\/[^#]*\(identifier\)$/
+
 /** Elements that go, with everything inside them. */
 const drops = [
   {name: 'chrome', tagName: ['style', 'link', 'meta', 'noscript']},
@@ -363,6 +378,15 @@ function walk(nodes, options, counts) {
     const children = walk(node.children, inside, counts)
     const kept = properties(node, options)
 
+    // A citation's link to the page that explains what an ISBN is. Read off
+    // the href the node arrived with rather than the rewritten one, because
+    // by now `(identifier)` has been slugified away.
+    if (node.tagName === 'a' && identifier.test(String(node.properties?.href ?? ''))) {
+      count(counts, 'identifier-links')
+      out.push(...children)
+      continue
+    }
+
     // A link that now points at nothing. Wikipedia's Harvard citations link
     // into `#CITEREFSeymour2006`, an anchor in the bibliography — which is end
     // matter, and gone. The words stay; the link does not, because a link to
@@ -561,9 +585,15 @@ function href(value, node, options) {
 
   // Articles only. A link to `File:`, `Help:` or `Category:` is a link out of
   // the encyclopedia's prose and not a page anybody would import.
-  if (!page.includes(':')) options.linked?.add(page)
+  const outside = namespaced.test(page)
 
-  if (options.links === undefined || options.links === 'url') {
+  if (!outside) options.linked?.add(page)
+
+  // ...and not a page a vault of your own has either, so `wiki` mode leaves it
+  // where it points. Slugifying it writes `[[ IPA | helpipa/english ]]`: a
+  // link into a document that will never exist, and — because the slugifier
+  // keeps the slash — into a subdirectory as well.
+  if (outside || options.links === undefined || options.links === 'url') {
     return (
       'https://' + (options.lang ?? 'en') + '.wikipedia.org/wiki/' +
       encodeURIComponent(page.replaceAll(' ', '_')) + (fragment ? '#' + fragment : '')

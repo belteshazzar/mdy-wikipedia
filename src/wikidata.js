@@ -73,6 +73,13 @@ export function wikidataRecord(entity, labels, options = {}) {
   for (const [property, statements] of Object.entries(entity.claims ?? {})) {
     const name = slug(labels[property] ?? property)
     const best = rank(statements)
+
+    // Every statement deprecated is Wikidata saying the property has no
+    // current answer — Q8409's IMDb id and its Great Russian Encyclopedia id
+    // are each a single deprecated claim. Honouring rank means the property
+    // says nothing, not that the retracted value comes back.
+    if (!best.length) continue
+
     const isId = best[0].mainsnak?.datatype === 'external-id'
 
     if (isId && !options.identifiers) continue
