@@ -355,3 +355,14 @@ test('the records that were not asked for are simply not there', () => {
   assert.equal(matter.categories, undefined)
   assert.equal(matter.langlinks, undefined)
 })
+
+test('wiki mode records where its links go, by the name it gave them', () => {
+  const {data} = buildDocument(page, {now, links: 'wiki'})
+
+  // `[[ third-dynasty-of-ur ]]` says where it points and not what it points
+  // at, so a vault cannot tell a link that left the corpus from a broken one.
+  assert.equal(data['link-titles']['third-dynasty-of-ur'], 'Third Dynasty of Ur')
+
+  // Not in the other modes: there the href is already the whole answer.
+  assert.equal(built.data['link-titles'], undefined)
+})

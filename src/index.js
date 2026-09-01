@@ -110,6 +110,24 @@ export function buildDocument(page, options = {}) {
       : undefined,
     categories: page.categories,
     langlinks: page.langlinks,
+    // Where this page's links go, by the name `--links wiki` gave them.
+    //
+    // `links` is mdy's own: it collects the slugs a document points at as it
+    // parses. This is the other half of that — slug to the title it came from
+    // — and it needs its own key or it overwrites the parser's.
+    //
+    // Only in that mode, because only there is it needed and only there is it
+    // small enough to be worth having: a `[[ fort-julien ]]` says where it
+    // points but not what it points AT, and a vault holding a slice of
+    // Wikipedia cannot otherwise tell a link that has simply left the corpus
+    // from one that is broken — nor send the reader anywhere sensible when it
+    // has. The slug is what mdy will resolve, so the slug is the key.
+    'link-titles':
+      options.links === 'wiki' && links.length
+        ? Object.fromEntries(
+            [...links].sort().map((title) => [defaultResolve(title), title])
+          )
+        : undefined,
     sections: outline(tree, defaultResolve),
     references:
       options.refs === 'data'
