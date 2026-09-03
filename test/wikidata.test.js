@@ -240,3 +240,42 @@ test('a property whose every statement is deprecated says nothing', () => {
   assert.equal(record.claims['imdb-id'], undefined)
   assert.equal(record.claims['instance-of'], 'human')
 })
+
+test('a month before the era is said, not bracketed', () => {
+  const at = (time, precision) =>
+    wikidataRecord(
+      {
+        id: 'Q1',
+        claims: {
+          P1: [
+            {
+              rank: 'normal',
+              mainsnak: {
+                snaktype: 'value',
+                datatype: 'time',
+                datavalue: {type: 'time', value: {time, precision}}
+              }
+            }
+          ]
+        }
+      },
+      {P1: 'inception'}
+    ).claims.inception
+
+  // Antioch's inception is May, 300 BC. `300 BC (05)` keeps the precision and
+  // spends it on a number nobody reads as a month — and it reaches the page.
+  assert.equal(at('-0300-05-00T00:00:00Z', 10), 'May 300 BC')
+  assert.equal(at('-0044-03-15T00:00:00Z', 11), '15 March 44 BC')
+
+  // After the era it stays ISO, where the year leads and it sorts.
+  assert.equal(at('+1815-12-10T00:00:00Z', 11), '1815-12-10')
+  assert.equal(at('+1815-12-00T00:00:00Z', 10), '1815-12')
+
+  // Year precision and coarser are untouched.
+  assert.equal(at('-2200-00-00T00:00:00Z', 9), '2200 BC')
+
+  // A decade pluralises the number, not the era. Ctesiphon was founded in the
+  // 120s BC and the record said `120 BCs`.
+  assert.equal(at('-0120-00-00T00:00:00Z', 8), '120s BC')
+  assert.equal(at('+1810-00-00T00:00:00Z', 8), '1810s')
+})

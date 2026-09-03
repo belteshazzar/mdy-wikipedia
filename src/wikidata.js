@@ -46,6 +46,11 @@ const qualifiers = [
 ]
 
 const bce = (year) => Math.abs(year) + ' BC'
+// eslint-disable-next-line no-unused-vars -- read by `time` below
+const months = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+]
 const ordinal = (value) => {
   const rest = value % 100
   const suffix =
@@ -249,18 +254,27 @@ function time(value) {
 
   if (!year) return
 
+  // A month before the era is written the way it is said. `300 BC (05)` keeps
+  // the precision and spends it on a bracketed number nobody reads as May —
+  // and it reaches the page, because an inception is what a city's era line is
+  // built from. An AD date stays ISO, where a leading year sorts.
   if (value.precision >= 11) {
     return before
-      ? bce(year) + ' (' + month + '-' + day + ')'
+      ? Number(day) + ' ' + months[Number(month) - 1] + ' ' + bce(year)
       : String(year).padStart(4, '0') + '-' + month + '-' + day
   }
 
   if (value.precision === 10) {
-    return before ? bce(year) + ' (' + month + ')' : String(year).padStart(4, '0') + '-' + month
+    return before
+      ? months[Number(month) - 1] + ' ' + bce(year)
+      : String(year).padStart(4, '0') + '-' + month
   }
 
   if (value.precision === 9) return before ? bce(year) : String(year)
-  if (value.precision === 8) return (before ? bce(year) : year) + 's'
+  // A decade pluralises the number, not the era: the 120s BC, not `120 BCs`.
+  if (value.precision === 8) {
+    return before ? Math.abs(year) + 's BC' : year + 's'
+  }
   if (value.precision === 7) {
     return ordinal(Math.ceil(year / 100)) + ' century' + (before ? ' BC' : '')
   }
